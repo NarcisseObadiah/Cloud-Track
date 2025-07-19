@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paas-api
+  labels:
+    app: paas-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paas-api
+  template:
+    metadata:
+      labels:
+        app: paas-api
+    spec:
+      containers:
+      - name: paas-api
+        image: narcisse198/paas-api:latest
+        ports:
+        - containerPort: 8080
+

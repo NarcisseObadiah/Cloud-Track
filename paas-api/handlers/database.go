@@ -1,14 +1,15 @@
 package handlers
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"paas-api/k8s"
+
+	"github.com/gin-gonic/gin"
 )
 
 type DBRequest struct {
 	Username string `json:"username" binding:"required"`
-	DBName   string `json:"db_name" binding:"required"`
+	DBName   string `json:"db_name"  binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
 

@@ -1,16 +1,31 @@
 package k8s
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"text/template"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
 )
+
+
+type TemplateData struct {
+	Namespace string
+	DBName    string
+	DBUser    string
+	Password  string
+	Team      string
+}
+
 
 func ProvisionTenantDB(namespace, dbName, password string) error {
 	clientset, err := getKubeClient()
@@ -18,19 +33,72 @@ func ProvisionTenantDB(namespace, dbName, password string) error {
 		return fmt.Errorf("failed to get k8s client: %w", err)
 	}
 
-	// Test connectivity by listing namespaces
-	namespaces, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+	// 1. Create Namespace
+	_, err = clientset.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to list namespaces: %w", err)
+		_, err = clientset.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: namespace},
+		}, metav1.CreateOptions{})
+
+		if err != nil {
+			return fmt.Errorf("failed to create namespace: %w", err)
+		}
 	}
 
-	fmt.Printf("✅ Connected to cluster. Found %d namespaces.\n", len(namespaces.Items))
-	fmt.Printf("📦 Would provision DB %q in namespace %q with password %q\n", dbName, namespace, password)
+	// 2. Create credentials secret
+	secretName := fmt.Sprintf("postgres.%s.credentials.postgresql.acid.zalan.do", dbName)
+	_, err = clientset.CoreV1().Secrets(namespace).Create(context.TODO(), &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: secretName,
+		},
+		StringData: map[string]string{
+			"username": dbName,
+			"password": password,
+		},
+	}, metav1.CreateOptions{})
 
-	// TODO: implement real provisioning (Namespace, Secret, PVC, StatefulSet, etc.)
+	if err != nil {
+		return fmt.Errorf("failed to create secret: %w", err)
+	}
+
+	// 3. Render and apply manifest
+	data := TemplateData{
+		Namespace: namespace,
+		DBName:    dbName,
+		DBUser:    dbName,
+		Password:  password,
+		Team:      "paas-team",
+	}
+
+	tmplPath := filepath.Join("templates", "postgres-cluster.yaml.tmpl")
+	tmplBytes, err := os.ReadFile(tmplPath)
+	if err != nil {
+		return fmt.Errorf("failed to read template: %w", err)
+	}
+
+	tmpl, err := template.New("postgres").Parse(string(tmplBytes))
+	if err != nil {
+		return fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	cmd := exec.Command("kubectl", "apply", "-f", "-")
+	cmd.Stdin = &buf
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to apply manifest: %w", err)
+	}
 
 	return nil
 }
+
+
 
 func getKubeClient() (*kubernetes.Clientset, error) {
 	// First, try in-cluster config (Kubernetes runtime)

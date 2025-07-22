@@ -1,0 +1,23 @@
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: {{ .DBName }}
+  namespace: {{ .Namespace }}
+spec:
+  teamId: "{{ .Team }}"
+  volume:
+    size: 5Gi
+  numberOfInstances: 1
+  users:
+    {{ .DBUser }}:  # database user
+    - superuser
+    - createdb
+  databases:
+    {{ .DBName }}: {{ .DBUser }}  # dbname: owner
+  postgresql:
+    version: "15"
+  enableConnectionPooler: false
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi

@@ -48,13 +48,30 @@ func DeleteTenantDB(namespace, dbName string) error {
 
 
 func CheckTenantDBStatus(namespace, dbName string) (string, error) {
-	// No need to call getKubeClient since we're using kubectl directly
+	// 1. Get PostgresClusterStatus from the CRD
 	cmd := exec.Command("kubectl", "get", "postgresql", dbName, "-n", namespace, "-o", "jsonpath={.status.PostgresClusterStatus}")
 	output, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to get status: %w", err)
+	status := strings.TrimSpace(string(output))
+
+	// If the CRD status is missing or CreateFailed, check pods directly
+	if err != nil || status == "" || status == "CreateFailed" {
+		// 2. Check if the DB pod is actually running
+		podCheck := exec.Command("kubectl", "get", "pods", "-n", namespace, "-l", fmt.Sprintf("cluster-name=%s", dbName), "-o", "jsonpath={.items[*].status.phase}")
+		podStatusBytes, podErr := podCheck.Output()
+		podStatus := strings.TrimSpace(string(podStatusBytes))
+
+		if podErr == nil && strings.Contains(podStatus, "Running") {
+			return "Running (fallback from pod)", nil
+		}
+
+		// If pod check fails, return original error
+		if err != nil {
+			return "", fmt.Errorf("failed to get CRD status: %w", err)
+		}
+		return status, nil
 	}
-	return string(output), nil
+
+	return status, nil
 }
 
 
@@ -65,23 +82,22 @@ func ProvisionTenantDB(namespace, dbName, password string) error {
 		return fmt.Errorf("failed to get k8s client: %w", err)
 	}
 
-	// 1. Create Namespace
+	// 1. Create Namespace if not exists
 	_, err = clientset.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{})
 	if err != nil {
 		_, err = clientset.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{Name: namespace},
 		}, metav1.CreateOptions{})
-
 		if err != nil {
 			return fmt.Errorf("failed to create namespace: %w", err)
 		}
 	}
 
-	// 2. Create credentials secret
-	secretName := fmt.Sprintf("postgres.%s.credentials.postgresql.acid.zalan.do", dbName)
+	// 2. Create tenant user secret (separate from operator secrets)
+	tenantSecretName := fmt.Sprintf("tenant-%s-credentials", dbName)
 	_, err = clientset.CoreV1().Secrets(namespace).Create(context.TODO(), &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: secretName,
+			Name: tenantSecretName,
 		},
 		StringData: map[string]string{
 			"username": dbName,
@@ -90,15 +106,15 @@ func ProvisionTenantDB(namespace, dbName, password string) error {
 	}, metav1.CreateOptions{})
 
 	if err != nil {
-		return fmt.Errorf("failed to create secret: %w", err)
+		return fmt.Errorf("failed to create tenant secret: %w", err)
 	}
 
-	// 3. Render and apply manifest
+	// 3. Render and apply manifest (without embedding password or secret references)
 	data := TemplateData{
 		Namespace: namespace,
 		DBName:    strings.ToLower(dbName),
 		DBUser:    strings.ToLower(dbName),
-		Password:  password,
+		Password:  "",  // <-- do NOT pass password here, operator handles secrets internally
 		Team:      "paas-team",
 	}
 

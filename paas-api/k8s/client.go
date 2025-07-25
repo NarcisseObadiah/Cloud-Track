@@ -26,6 +26,36 @@ type TemplateData struct {
 	Team      string
 }
 
+func DeleteTenantDB(namespace, dbName string) error {
+	clientset, err := getKubeClient()
+	if err != nil {
+		return fmt.Errorf("failed to get k8s client: %w", err)
+	}
+
+	// Option 1: Delete entire namespace (DB + secrets + CRs)
+	err = clientset.CoreV1().Namespaces().Delete(context.TODO(), namespace, metav1.DeleteOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to delete namespace: %w", err)
+	}
+	// Option 2: If keeping namespace, delete DB + secret:
+	// _ = clientset.CoreV1().Secrets(namespace).Delete(context.TODO(), secretName, metav1.DeleteOptions{})
+	// _ = exec.Command("kubectl", "delete", "postgresql", dbName, "-n", namespace).Run()
+
+	return nil
+}
+
+
+func CheckTenantDBStatus(namespace, dbName string) (string, error) {
+	// No need to call getKubeClient since we're using kubectl directly
+	cmd := exec.Command("kubectl", "get", "postgresql", dbName, "-n", namespace, "-o", "jsonpath={.status.PostgresClusterStatus}")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get status: %w", err)
+	}
+	return string(output), nil
+}
+
+
 
 func ProvisionTenantDB(namespace, dbName, password string) error {
 	clientset, err := getKubeClient()

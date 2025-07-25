@@ -14,6 +14,8 @@ func main() {
 	})
 
 	r.POST("/databases", handlers.CreateDatabase)
+	r.DELETE("/databases", handlers.DeleteDatabase)
+	r.GET("/databases/:username/:db_name/status", handlers.GetDatabaseStatus)
 
 	log.Println("API listening on port 8080")
 	r.Run(":8080")

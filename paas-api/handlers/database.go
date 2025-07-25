@@ -13,6 +13,53 @@ type DBRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+type DeleteDBRequest struct {
+	Username string `json:"username" binding:"required"`
+	DBName   string `json:"db_name"  binding:"required"`
+}
+
+func DeleteDatabase(c *gin.Context) {
+	var req DeleteDBRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	namespace := "tenant-" + req.Username
+	err := k8s.DeleteTenantDB(namespace, req.DBName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":   "Database deleted",
+		"namespace": namespace,
+		"db_name":   req.DBName,
+	})
+}
+
+
+
+func GetDatabaseStatus(c *gin.Context) {
+	username := c.Param("username")
+	dbName := c.Param("db_name")
+	namespace := "tenant-" + username
+
+	status, err := k8s.CheckTenantDBStatus(namespace, dbName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"db_name":  dbName,
+		"status":   status,
+		"username": username,
+	})
+}
+
+
 func CreateDatabase(c *gin.Context) {
 	var req DBRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -34,3 +81,4 @@ func CreateDatabase(c *gin.Context) {
 		"db_name":   req.DBName,
 	})
 }
+

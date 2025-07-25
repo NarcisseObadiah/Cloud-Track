@@ -16,6 +16,8 @@ func main() {
 	r.POST("/databases", handlers.CreateDatabase)
 	r.DELETE("/databases", handlers.DeleteDatabase)
 	r.GET("/databases/:username/:db_name/status", handlers.GetDatabaseStatus)
+	
+	r.GET("/pods/:namespace", handlers.ListTenantPodsHandler)
 
 	log.Println("API listening on port 8080")
 	r.Run(":8080")

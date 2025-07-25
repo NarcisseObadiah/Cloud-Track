@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"text/template"
 	"strings"
+	"time"
 
 
 	corev1 "k8s.io/api/core/v1"
@@ -19,7 +20,6 @@ import (
 
 )
 
-
 type TemplateData struct {
 	Namespace string
 	DBName    string
@@ -27,6 +27,41 @@ type TemplateData struct {
 	Password  string
 	Team      string
 }
+
+type PodInfo struct {
+	Name      string `json:"name"`
+	Status    string `json:"status"`
+	Namespace string `json:"namespace"`
+	Age       string `json:"age"`
+}
+
+
+
+func ListTenantPodsJSON(namespace string) ([]PodInfo, error) {
+	clientset, err := getKubeClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get k8s client: %w", err)
+	}
+
+	pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list pods: %w", err)
+	}
+
+	var result []PodInfo
+	for _, pod := range pods.Items {
+		age := time.Since(pod.CreationTimestamp.Time).Round(time.Second).String()
+		result = append(result, PodInfo{
+			Name:      pod.Name,
+			Status:    string(pod.Status.Phase),
+			Namespace: pod.Namespace,
+			Age:       age,
+		})
+	}
+	return result, nil
+}
+
+
 
 func DeleteTenantDB(namespace, dbName string) error {
 	clientset, err := getKubeClient()

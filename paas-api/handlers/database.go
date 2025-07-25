@@ -18,6 +18,19 @@ type DeleteDBRequest struct {
 	DBName   string `json:"db_name"  binding:"required"`
 }
 
+
+func ListTenantPodsHandler(c *gin.Context) {
+	namespace := c.Param("namespace")
+
+	pods, err := k8s.ListTenantPodsJSON(namespace)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, pods)
+}
+
 func DeleteDatabase(c *gin.Context) {
 	var req DeleteDBRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

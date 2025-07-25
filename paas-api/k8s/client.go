@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"text/template"
+	"strings"
+
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -94,8 +96,8 @@ func ProvisionTenantDB(namespace, dbName, password string) error {
 	// 3. Render and apply manifest
 	data := TemplateData{
 		Namespace: namespace,
-		DBName:    dbName,
-		DBUser:    dbName,
+		DBName:    strings.ToLower(dbName),
+		DBUser:    strings.ToLower(dbName),
 		Password:  password,
 		Team:      "paas-team",
 	}

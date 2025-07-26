@@ -30,12 +30,79 @@ type TemplateData struct {
 
 type PodInfo struct {
 	Name      string `json:"name"`
-	Status    string `json:"status"`
 	Namespace string `json:"namespace"`
+	Status    string `json:"status"`
 	Age       string `json:"age"`
+	Node      string `json:"node"`
+	Restarts  int32  `json:"restarts"`
+	CPU       string `json:"cpu"`
+	Memory    string `json:"memory"`
+}
+
+func ListAllTenantPods() ([]PodInfo, error) {
+	clientset, err := getKubeClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get k8s client: %w", err)
+	}
+
+	nsList, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list namespaces: %w", err)
+	}
+
+	var pods []PodInfo
+
+	for _, ns := range nsList.Items {
+		if !isTenantNamespace(ns.Name) {
+			continue
+		}
+
+		podList, err := clientset.CoreV1().Pods(ns.Name).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to list pods in namespace %s: %w", ns.Name, err)
+		}
+
+		for _, pod := range podList.Items {
+			age := time.Since(pod.CreationTimestamp.Time).Round(time.Second).String()
+
+			var restarts int32
+			for _, cs := range pod.Status.ContainerStatuses {
+				restarts += cs.RestartCount
+			}
+
+			cpu := "N/A"
+			mem := "N/A"
+			if len(pod.Spec.Containers) > 0 {
+				req := pod.Spec.Containers[0].Resources.Requests
+				if cpuQty, ok := req[corev1.ResourceCPU]; ok {
+					cpu = cpuQty.String()
+				}
+				if memQty, ok := req[corev1.ResourceMemory]; ok {
+					mem = memQty.String()
+				}
+			}
+
+			pods = append(pods, PodInfo{
+				Name:      pod.Name,
+				Namespace: ns.Name,
+				Status:    string(pod.Status.Phase),
+				Age:       age,
+				Node:      pod.Spec.NodeName,
+				Restarts:  restarts,
+				CPU:       cpu,
+				Memory:    mem,
+			})
+		}
+	}
+
+	return pods, nil
 }
 
 
+// Helper to identify tenant namespaces (adjust prefix as needed)
+func isTenantNamespace(ns string) bool {
+	return len(ns) > 7 && ns[:7] == "tenant-"
+}
 
 func ListTenantPodsJSON(namespace string) ([]PodInfo, error) {
 	clientset, err := getKubeClient()
@@ -110,7 +177,6 @@ func CheckTenantDBStatus(namespace, dbName string) (string, error) {
 }
 
 
-
 func ProvisionTenantDB(namespace, dbName, password string) error {
 	clientset, err := getKubeClient()
 	if err != nil {
@@ -149,7 +215,7 @@ func ProvisionTenantDB(namespace, dbName, password string) error {
 		Namespace: namespace,
 		DBName:    strings.ToLower(dbName),
 		DBUser:    strings.ToLower(dbName),
-		Password:  "",  // <-- do NOT pass password here, operator handles secrets internally
+		Password:  "",  //no pass password here, operator handles secrets internally
 		Team:      "paas-team",
 	}
 

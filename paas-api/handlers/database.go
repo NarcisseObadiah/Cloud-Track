@@ -19,6 +19,17 @@ type DeleteDBRequest struct {
 }
 
 
+// ListAllTenantPodsHandler returns pods grouped by tenant namespace
+func ListAllTenantPodsHandler(c *gin.Context) {
+	podGroups, err := k8s.ListAllTenantPods()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, podGroups)
+}
+
+
 func ListTenantPodsHandler(c *gin.Context) {
 	namespace := c.Param("namespace")
 

@@ -4,23 +4,25 @@ import (
 	"log"
 	"github.com/gin-gonic/gin"
 	"paas-api/handlers"
+	"paas-api/auth"
 )
 
 func main() {
+	if err := middleware.InitJWT(); err != nil {
+		log.Fatalf("Failed to initialize JWKS: %v", err)
+	}
+
 	r := gin.Default()
 
-	r.GET("/", func(c *gin.Context) {
-		c.JSON(200, gin.H{"message": "PaaS API is running!"})
-	})
+	// Public / tenant routes
+	r.POST("/databases", middleware.AuthMiddleware("tenant"), handlers.CreateDatabase)
+	r.DELETE("/databases", middleware.AuthMiddleware("tenant"), handlers.DeleteDatabase)
+	r.GET("/databases/:username/:db_name/status", middleware.AuthMiddleware("tenant"), handlers.GetDatabaseStatus)
+	r.GET("/pods/:namespace", middleware.AuthMiddleware("tenant"), handlers.ListTenantPodsHandler)
 
-	// Public / tenant-level routes
-	r.POST("/databases", handlers.CreateDatabase)
-	r.DELETE("/databases", handlers.DeleteDatabase)
-	r.GET("/databases/:username/:db_name/status", handlers.GetDatabaseStatus)
-	r.GET("/pods/:namespace", handlers.ListTenantPodsHandler)
-
-	// Admin routes (add auth middleware later)
+	// Admin routes
 	admin := r.Group("/admin")
+	admin.Use(middleware.AuthMiddleware("admin"))
 	{
 		admin.GET("/tenants/pods", handlers.ListAllTenantPodsHandler)
 	}

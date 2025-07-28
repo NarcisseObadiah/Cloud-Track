@@ -31,40 +31,47 @@ func AuthMiddleware(requiredRoles ...string) gin.HandlerFunc {
 
 		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 
-		// Parse and validate the token
 		token, err := jwt.Parse(tokenStr, jwks.Keyfunc)
 		if err != nil || !token.Valid {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
 			return
 		}
 
-		// Extract claims
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid claims"})
 			return
 		}
 
-		// Extract role (e.g. "admin" or "tenant")
-		role, ok := claims["role"].(string)
+		// Zitadel roles claim key
+		rolesClaimKey := "urn:zitadel:iam:org:project:roles"
+
+		rolesMap, ok := claims[rolesClaimKey].(map[string]interface{})
 		if !ok {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "missing role in token"})
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "no roles in token"})
 			return
 		}
 
-		// Check if user's role matches any of the allowed roles
-		if !contains(requiredRoles, role) {
+		// Check if user has one of the required roles
+		hasRole := false
+		for _, role := range requiredRoles {
+			if _, ok := rolesMap[role]; ok {
+				hasRole = true
+				c.Set("role", role) // optional: store role in context
+				break
+			}
+		}
+
+		if !hasRole {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
 			return
 		}
 
-		// Store role and user ID (optional) in context
-		c.Set("role", role)
-		c.Set("user_id", claims["sub"])
-
+		c.Set("user_id", claims["sub"]) // optional
 		c.Next()
 	}
 }
+
 
 func contains(list []string, target string) bool {
 	for _, val := range list {

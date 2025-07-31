@@ -10,7 +10,7 @@ import (
 type DBRequest struct {
 	Username string `json:"username" binding:"required"`
 	DBName   string `json:"db_name"  binding:"required"`
-	Password string `json:"password" binding:"required"`
+	Password string `json:"password" `
 }
 
 type DeleteDBRequest struct {

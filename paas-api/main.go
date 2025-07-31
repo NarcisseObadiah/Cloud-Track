@@ -5,6 +5,8 @@ import (
     "github.com/gin-gonic/gin"
     "paas-api/auth"
     "paas-api/handlers"
+    "github.com/gin-contrib/cors"
+
 )
 
 
@@ -14,6 +16,15 @@ func main() {
     }
 
     r := gin.Default()
+
+    // 👇 Add CORS configuration here
+    r.Use(cors.New(cors.Config{
+        AllowOrigins:     []string{"http://localhost:5173"}, // your frontend URL
+        AllowMethods:     []string{"GET", "POST", "DELETE", "PUT", "OPTIONS"},
+        AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+        ExposeHeaders:    []string{"Content-Length"},
+        AllowCredentials: true,
+    }))
 
     // Public / tenant routes
     r.POST("/databases", middleware.AuthMiddleware("tenant"), handlers.CreateDatabase)

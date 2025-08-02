@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	// "fmt"
 	"net/http"
 	"strings"
 
@@ -9,10 +10,8 @@ import (
 	"github.com/MicahParks/keyfunc"
 )
 
-// Replace with your Zitadel JWKS endpoint
 const zitadelJWKSURL = "https://openstack-integration-3vzdfy.us1.zitadel.cloud/oauth/v2/keys"
 
-// Cached JWKS
 var jwks *keyfunc.JWKS
 
 func InitJWT() error {
@@ -43,22 +42,26 @@ func AuthMiddleware(requiredRoles ...string) gin.HandlerFunc {
 			return
 		}
 
-		// Zitadel roles claim key
+		// 🔍 Debugging (optional):
+		// fmt.Printf("JWT Claims: %+v\n", claims)
+
 		rolesClaimKey := "urn:zitadel:iam:org:project:roles"
 
-		rolesMap, ok := claims[rolesClaimKey].(map[string]interface{})
+		rawRoles, ok := claims[rolesClaimKey].(map[string]interface{})
 		if !ok {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "no roles in token"})
 			return
 		}
 
-		// Check if user has one of the required roles
+		// ✅ Check for required role(s)
 		hasRole := false
-		for _, role := range requiredRoles {
-			if _, ok := rolesMap[role]; ok {
-				hasRole = true
-				c.Set("role", role) // optional: store role in context
-				break
+		for _, required := range requiredRoles {
+			if inner, exists := rawRoles[required]; exists {
+				if innerMap, ok := inner.(map[string]interface{}); ok && len(innerMap) > 0 {
+					hasRole = true
+					c.Set("role", required) // Optional
+					break
+				}
 			}
 		}
 
@@ -67,17 +70,7 @@ func AuthMiddleware(requiredRoles ...string) gin.HandlerFunc {
 			return
 		}
 
-		c.Set("user_id", claims["sub"]) // optional
+		c.Set("user_id", claims["sub"])
 		c.Next()
 	}
-}
-
-
-func contains(list []string, target string) bool {
-	for _, val := range list {
-		if val == target {
-			return true
-		}
-	}
-	return false
 }

@@ -1,0 +1,16 @@
+<!-- public/silent-renew.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Silent Renew</title>
+</head>
+<body>
+  <script type="module">
+    import { userManager } from '../src/auth/useAuth.js'
+
+    userManager.signinSilentCallback().catch(err => {
+      console.error('Silent renew error:', err)
+    })
+  </script>
+</body>
+</html>

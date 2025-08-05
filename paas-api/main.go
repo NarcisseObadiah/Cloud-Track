@@ -11,7 +11,7 @@ import (
 
 
 func main() {
-    if err := middleware.InitJWT(); err != nil {
+    if err := auth.InitJWT(); err != nil {
         log.Fatalf("Failed to initialize JWKS: %v", err)
     }
 
@@ -27,14 +27,17 @@ func main() {
     }))
 
     // Public / tenant routes
-    r.POST("/databases", middleware.AuthMiddleware("tenant"), handlers.CreateDatabase)
-    r.DELETE("/databases", middleware.AuthMiddleware("tenant"), handlers.DeleteDatabase)
-    r.GET("/databases/:username/:db_name/status", middleware.AuthMiddleware("tenant"), handlers.GetDatabaseStatus)
-    r.GET("/pods/:namespace", middleware.AuthMiddleware("tenant"), handlers.ListTenantPodsHandler)
+    r.POST("/databases", auth.AuthMiddleware("tenant"), handlers.CreateDatabase)
+    r.DELETE("/databases", auth.AuthMiddleware("tenant"), handlers.DeleteDatabase)
+    r.GET("/databases/:username/:db_name/status", auth.AuthMiddleware("tenant"), handlers.GetDatabaseStatus)
+    r.GET("/databases/:username/:db_name/credentials", auth.AuthMiddleware("tenant"), handlers.GetDatabaseCredentials)
+    r.GET("/databases/:username/:db_name", auth.AuthMiddleware("tenant"), handlers.GetDatabaseClusterDetails)
+    r.GET("/databases/:username", auth.AuthMiddleware("tenant"), handlers.ListDatabaseClusters)
+    r.GET("/pods/:namespace", auth.AuthMiddleware("tenant"), handlers.ListTenantPodsHandler)
 
     // Admin routes
     admin := r.Group("/admin")
-    admin.Use(middleware.AuthMiddleware("admin"))
+    admin.Use(auth.AuthMiddleware("admin"))
     {
         admin.GET("/tenants/pods", handlers.ListAllTenantPodsHandler)
     }

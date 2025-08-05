@@ -7,17 +7,20 @@ spec:
   teamId: "{{ .Team }}"
   volume:
     size: 5Gi
-  numberOfInstances: 1
+  numberOfInstances: {{ .Replicas }}
   users:
-    {{ .DBUser }}:  # database user
-    - superuser
-    - createdb
+    {{ .DBName }}:  # database owner user (same as db name)
+      - superuser
+      - createdb
   databases:
-    {{ .DBName }}: {{ .DBUser }}  # dbname: owner
+    {{ .DBName }}: {{ .DBName }}  # dbname: owner (both same as db name)
   postgresql:
     version: "15"
   enableConnectionPooler: false
   resources:
     requests:
-      cpu: 50m
-      memory: 52Mi
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

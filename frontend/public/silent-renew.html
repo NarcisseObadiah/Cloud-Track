@@ -5,12 +5,25 @@
   <title>Silent Renew</title>
 </head>
 <body>
-  <script type="module">
-    import { userManager } from '../src/auth/useAuth.js'
+  <script src="https://unpkg.com/oidc-client-ts@3.3.0/dist/browser/oidc-client-ts.min.js"></script>
+  <script>
+    const { UserManager, WebStorageStateStore } = window.oidc;
+    
+    const userManager = new UserManager({
+      authority: 'https://openstack-integration-3vzdfy.us1.zitadel.cloud',
+      client_id: '328409700146201818',
+      response_type: 'code',
+      scope: 'openid profile email',
+      userStore: new WebStorageStateStore({ store: window.localStorage })
+    });
 
-    userManager.signinSilentCallback().catch(err => {
-      console.error('Silent renew error:', err)
-    })
+    userManager.signinSilentCallback()
+      .then(() => {
+        console.log('Silent renew successful');
+      })
+      .catch(err => {
+        console.error('Silent renew error:', err);
+      });
   </script>
 </body>
 </html>

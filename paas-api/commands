@@ -1,0 +1,127 @@
+Resource	Value
+Pod	paas-api-5c4ff78cbb-v7mpz
+Status	Running
+Node	k8s-worker-1 or 2
+Service Type	NodePort
+Cluster IP	10.43.229.166
+Exposed Port	80 (→ mapped to 30971 on node)
+External Access	via any node on port 30971
+
+🌐 How to Access the API from Outside
+
+1-Find your node IP address
+
+kubectl get nodes -o wide
+
+NAME           STATUS   ROLES                  AGE   VERSION        INTERNAL-IP       EXTERNAL-IP   OS-IMAGE                         KERNEL-VERSION   CONTAINER-RUNTIME
+k8s-master     Ready    control-plane,master   44h   v1.32.6+k3s1   192.168.100.249   <none>        Debian GNU/Linux 12 (bookworm)   6.1.0-37-amd64   containerd://2.0.5-k3s1.32
+k8s-worker-1   Ready    <none>                 29h   v1.32.6+k3s1   192.168.100.98    <none>        Debian GNU/Linux 12 (bookworm)   6.1.0-37-amd64   containerd://2.0.5-k3s1.32
+k8s-worker-2   Ready    <none>                 29h   v1.32.6+k3s1   192.168.100.144   <none>        Debian GNU/Linux 12 (bookworm)   6.1.0-37-amd64   containerd://2.0.5-k3s1
+
+Look under the EXTERNAL-IP or INTERNAL-IP column (usually internal if it's a private cluster).
+
+2- Access your API
+Replace <NODE-IP> with the IP of a worker node.
+
+curl -X POST http://<NODE-IP>:30971/databases \
+  -H "Content-Type: application/json" \
+  -d '{"username":"testuser","db_name":"mydb","password":"pass123"}'
+
+
+
+kubectl port-forward svc/monitoring-kube-prometheus-prometheus -n monitoring 9090:9090
+Forwarding from 127.0.0.1:9090 -> 9090
+Forwarding from [::1]:9090 -> 9090
+
+
+View logs for that pod:
+
+kubectl logs paas-api-5c4ff78cbb-v7mpz
+
+
+
+Forward port to be able send POST REQUEST INSIDE THE CLUSTER
+
+>kubectl port-forward deployment/paas-api 8080:8080
+Forwarding from 127.0.0.1:8080 -> 8080
+Forwarding from [::1]:8080 -> 8080
+Handling connection for 8080
+
+
+
+
+
+Terraform var
+
+os_auth_url     = "http://91.99.215.178/identity"
+os_region       = "RegionOne"
+os_username     = "admin"
+os_password     = "96548d1fb11320d4f804"
+os_project_name = "admin"
+
+
+
+external_network_name = "public"
+external_network_id   = "0b6c3177-e320-4351-8792-f169713ffc12"
+
+
+Hosts	ini
+
+[k3s_master]
+k8s-master ansible_host=<172.24.4.79> ansible_user=debian
+
+[k3s_workers]
+k8s-worker-1 ansible_host=172.24.4.87 ansible_user=debian
+k8s-worker-2 ansible_host=172.24.4.140 ansible_user=debian
+
+[all:vars]
+ansible_ssh_private_key_file=~/.ssh/id_rsa
+
+
+Tunnel forwarding to communicate with tube api server 
+
+ssh -L 6443:localhost:6443 debian@172.24.4.79
+
+Docker build
+
+docker build -t narcisse198/paas-api:latest .
+
+docker run -p 8080:8080 -v ~/.kube:/root/.kube narcisse198/paas-api:latest
+
+docker push narcisse198/paas-api:latest
+
+
+ curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+- name: Install Helm binary
+  become: yes
+  shell: |
+    curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  args:
+    creates: /usr/local/bin/helm
+
+
+
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+
+helm install monitoring prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace
+
+Get Grafana 'admin' user password by running:
+
+  kubectl --namespace monitoring get secrets monitoring-grafana -o jsonpath="{.data.admin-password}" | base64 -d ; echo
+
+Access Grafana local instance:
+
+  export POD_NAME=$(kubectl --namespace monitoring get pod -l "app.kubernetes.io/name=grafana,app.kubernetes.io/instance=monitoring" -oname)
+  kubectl --namespace monitoring port-forward $POD_NAME 3000
+
+
+
+ sudo kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80
+Forwarding from 127.0.0.1:3000 -> 3000
+Forwarding from [::1]:3000 -> 3000
+
+
+grafana_user: admin
+Password:prom-operator

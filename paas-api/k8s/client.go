@@ -407,15 +407,35 @@ func ProvisionTenantDBWithCredentials(namespace, dbName string, replicas int) (m
 		return nil, fmt.Errorf("failed to get k8s client: %w", err)
 	}
 
-	// 1. Create Namespace if not exists
-	_, err = clientset.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{})
-	if err != nil {
-		_, err = clientset.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+	// 1. Create Namespace if not exists (with retry)
+	fmt.Printf("Ensuring namespace %s exists...\n", namespace)
+	
+	var nsErr error
+	for attempts := 0; attempts < 3; attempts++ {
+		_, err = clientset.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{})
+		if err == nil {
+			fmt.Printf("Namespace %s already exists\n", namespace)
+			break
+		}
+		
+		// Try to create namespace
+		_, nsErr = clientset.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{Name: namespace},
 		}, metav1.CreateOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create namespace: %w", err)
+		
+		if nsErr == nil {
+			fmt.Printf("Created namespace %s\n", namespace)
+			break
 		}
+		
+		if attempts < 2 {
+			fmt.Printf("Namespace creation attempt %d failed, retrying... %v\n", attempts+1, nsErr)
+			time.Sleep(2 * time.Second)
+		}
+	}
+	
+	if nsErr != nil && err != nil {
+		return nil, fmt.Errorf("failed to create namespace after 3 attempts: %w", nsErr)
 	}
 
 	// 2. Render and apply manifest
@@ -451,68 +471,32 @@ func ProvisionTenantDBWithCredentials(namespace, dbName string, replicas int) (m
 		return nil, fmt.Errorf("failed to apply manifest: %w", err)
 	}
 
-	// 3. Wait for pod to be ready
-	fmt.Printf("Waiting for PostgreSQL pod to be ready...\n")
-	
-	// Wait up to 3 minutes for pod to be running
-	podReady := false
-	var lastPodStatus string
-	for attempts := 0; attempts < 90; attempts++ {
-		pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("cluster-name=%s", dbName),
-		})
-		
-		if err == nil && len(pods.Items) > 0 {
-			for _, pod := range pods.Items {
-				lastPodStatus = string(pod.Status.Phase)
-				if pod.Status.Phase == corev1.PodRunning {
-					// Check if containers are ready
-					allContainersReady := true
-					for _, status := range pod.Status.ContainerStatuses {
-						if !status.Ready {
-							allContainersReady = false
-							break
-						}
-					}
-					if allContainersReady {
-						podReady = true
-						break
-					}
-				}
-				
-				// Log any error conditions
-				if pod.Status.Phase == corev1.PodFailed {
-					return nil, fmt.Errorf("pod failed to start: %s", pod.Status.Message)
-				}
-			}
-		}
-		
-		if podReady {
-			break
-		}
-		
-		// Show progress every 30 seconds
-		if attempts > 0 && attempts%15 == 0 {
-			fmt.Printf("Still waiting for pod... (%d seconds elapsed, current status: %s)\n", attempts*2, lastPodStatus)
-		}
-		
-		time.Sleep(2 * time.Second)
+	fmt.Printf("Database manifest applied successfully!\n")
+
+	// 3. Return immediate credentials based on Zalando naming conventions
+	// The actual credentials will be created by Zalando operator in the background
+	result := map[string]interface{}{
+		"database_name": dbName,
+		"host": fmt.Sprintf("%s.%s.svc.cluster.local", dbName, namespace),
+		"port": "5432",
+		"status": "provisioning",
+		"message": "Database is being created. Credentials will be available shortly.",
+		"secret_name": fmt.Sprintf("%s.%s.credentials.postgresql.acid.zalan.do", dbName, dbName),
+		"connection_info": map[string]string{
+			"host": fmt.Sprintf("%s.%s.svc.cluster.local", dbName, namespace),
+			"port": "5432",
+			"database": dbName,
+			"ssl_mode": "prefer",
+			"note": "Username and password will be available in the secret once ready",
+		},
+		"instructions": map[string]string{
+			"check_status": fmt.Sprintf("kubectl get postgresql %s -n %s", dbName, namespace),
+			"get_credentials": fmt.Sprintf("kubectl get secret %s.%s.credentials.postgresql.acid.zalan.do -n %s -o yaml", dbName, dbName, namespace),
+		},
 	}
 
-	if !podReady {
-		return nil, fmt.Errorf("pod not ready after 3 minutes, last status: %s", lastPodStatus)
-	}
-
-	fmt.Printf("Pod is ready, waiting for Zalando credentials...\n")
-
-	// 4. Wait for Zalando credentials (2 minutes should be enough)
-	credentials, err := GetDatabaseCredentials(namespace, dbName, 2*time.Minute)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get database credentials: %v", err)
-	}
-
-	fmt.Printf("Database creation successful!\n")
-	return credentials, nil
+	fmt.Printf("Database creation initiated for %s in namespace %s\n", dbName, namespace)
+	return result, nil
 }
 
 
@@ -588,18 +572,43 @@ func GetDatabaseCredentials(namespace, dbName string, timeout time.Duration) (ma
 
 
 func getKubeClient() (*kubernetes.Clientset, error) {
-	// First, try in-cluster config (Kubernetes runtime)
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		// Fallback to kubeconfig file (local development)
-		kubeconfig := filepath.Join(homeDir(), ".kube", "config")
+	var config *rest.Config
+	var err error
+
+	// For local development, always use kubeconfig file first
+	kubeconfig := filepath.Join(homeDir(), ".kube", "config")
+	if _, err := os.Stat(kubeconfig); err == nil {
+		fmt.Printf("Using kubeconfig file: %s\n", kubeconfig)
 		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load kubeconfig: %w", err)
+			fmt.Printf("Failed to load kubeconfig file: %v\n", err)
 		}
 	}
 
-	return kubernetes.NewForConfig(config)
+	// Fallback to in-cluster config if kubeconfig failed
+	if config == nil {
+		fmt.Printf("Trying in-cluster configuration...\n")
+		config, err = rest.InClusterConfig()
+		if err != nil {
+			return nil, fmt.Errorf("failed to load both kubeconfig and in-cluster config: %w", err)
+		}
+	}
+
+	// Set a reasonable timeout
+	config.Timeout = 30 * time.Second
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
+	// Test the connection
+	_, err = clientset.Discovery().ServerVersion()
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to kubernetes API server: %w", err)
+	}
+
+	return clientset, nil
 }
 
 func homeDir() string {

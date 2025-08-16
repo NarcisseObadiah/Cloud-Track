@@ -2,7 +2,7 @@
 
 A comprehensive Platform-as-a-Service (PaaS) solution built on OpenStack infrastructure with Kubernetes orchestration, providing managed database services with automated provisioning, monitoring, and multi-tenant support.
 
-![Platform Architecture](docs/images/architecture-overview.png)
+![Platform Architecture](/paas.png)
 
 ## 🚀 Project Overvi  d '{"username":"testuser","db_name":"mydb"}'
 ```

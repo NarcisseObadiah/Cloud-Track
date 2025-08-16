@@ -85,23 +85,18 @@ This project implements a complete cloud platform following a three-phase develo
 
 ## 🏗️ Architecture
 ### Infrastructure Components
-- **OpenStack Cluster**: 3-node setup (1 master, 2 workers)
-- **Kubernetes Cluster**: K3s distribution for lightweight orchestration
-- **Database Service**: Zalando PostgreSQL Operator for managed databases
-- **Monitoring Stack**: Prometheus + Grafana + Loki
-- **API Gateway**: Go-based REST API with Gin framework
-![Infrastructure Diagram](/images/full-infra.png)
-
--**Security Group**
-![Infrastructure Diagram](/images/security_group.png)
-
--**Instances with in Cluster Ip and Floating Ip for external access**
-![Infrastructure Diagram](/images/instances.png)
-
 -**Terraforn For Provisioning**
 ![Infrastructure Diagram](/images/terra-for-infra.png)
 
+- **OpenStack Cluster**: 3-node setup (1 master, 2 workers)
+- **Kubernetes Cluster**: K3s distribution for lightweight orchestration (Ansible)
+ ![Infrastructure Diagram](/images/full-infra.png)
 
+- **Database Service**: Zalando PostgreSQL Operator for managed databases
+  ![Database Management UI](/images/db-cluster-overview.png)
+  
+- Pod Management Dasboard, after creation
+![Pod Management Dashboard](/images/Pods_Mgmt.png)
 
 ### Technology Stack
 
@@ -229,9 +224,6 @@ GET /pods/{namespace}
 ```
 
 
-![Database Management UI](/images/db-cluster-overview.png)
-![Pod Management Dashboard](/images/Pods_Mgmt.png)
-
 ## 🔧 Configuration
 
 ### Environment Variables
@@ -311,24 +303,21 @@ kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80
 
 ### Zitadel Integration
 
-![Authentication Flow](/images/Zitadel_Conf.png)
-
 1. **User Authentication**: Login via Zitadel IdP
 2. **JWT Token**: Secure token generation
 3. **RBAC**: Role-based access control
 4. **API Authorization**: Bearer token validation
 
-### Security Groups
+![Authentication Flow](/images/Zitadel_Conf.png)
 
+### Security Groups
 OpenStack security groups configured for:
 - **SSH Access**: Port 22 for management
 - **API Access**: Port 8080 for PaaS API
 - **Kubernetes**: Ports 6443, 10250 for cluster communication
 - **Database**: Port 5432 for PostgreSQL (internal only)
 
-## 🌐 Multi-Tenant overview
-
-![Multi-Tenant Dashboard](/images/db-cluster-overview.png)
+![Infrastructure Diagram](/images/security_group.png)
 
 ### Namespace Isolation
 

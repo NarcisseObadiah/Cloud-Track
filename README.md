@@ -4,57 +4,62 @@ A comprehensive Platform-as-a-Service (PaaS) solution built on OpenStack infrast
 
 ![Platform Architecture](/paas.png)
 
-## 🚀 Project Overvi  d '{"username":"testuser","db_name":"mydb"}'
-```
+## 🚀 Project Overview
+
 
 ## 🖥️ Frontend User Interface
 
 The Vue.js frontend provides a comprehensive web interface for managing the PaaS platform:
 
 ### System Administrator Dashboard
-![System Admin Dashboard](docs/images/system-admin-dashboard.png)
 
 **Features:**
 - Real-time cluster health monitoring
 - Resource utilization overview
 - Active tenant management
-- System alerts and notifications
+  
+![System Admin Dashboard](images/sys-admin.png)
 
 ### Database Management Interface
-![Database Creation Form](docs/images/database-creation-form.png)
+![Database Creation Form](/images/db-mngt.png)
 
-**Capabilities:**
+### Database instance form
 - Interactive database creation wizard
-- Database instance management
+![Database Creation Form](/images/db-creaton-on.png)
+
+**Response after Database Creation Request**
 - Connection string generation
-- Performance metrics visualization
+- Hashed password provided
+- Multi environnement config provided to authenticate to the database instance
+![Database Creation Form](/images/db-response.png)
 
 ### Tenant Management Console
-![Tenant Console](docs/images/tenant-console.png)
-
 **User Features:**
 - Personal database dashboard
 - Resource usage tracking
-- Billing and quota information
 - Self-service database operations
+![Tenant Console](/images/Tenants.png)
 
 ### Pod and Service Monitoring
-![Pod Status View](docs/images/pod-status-view.png)
-
 **Monitoring Views:**
 - Real-time pod status grid
 - Service health indicators
 - Log streaming interface
 - Resource consumption charts
+  
+![Pod Status View](/images/admin-pod-overview.png)
 
-### User Authentication Interface
-![Login Interface](docs/images/login-interface.png)
+
+### User Authentication Third Party through Zitadel
 
 **Security Features:**
 - Zitadel SSO integration
 - Role-based access control
 - Session management
 - Multi-factor authentication support
+  
+![Login Interface](/images/add-user.png)
+
 
 This project implements a complete cloud platform following a three-phase development approach:
 
@@ -73,22 +78,30 @@ This project implements a complete cloud platform following a three-phase develo
 - **Auto-scaling**: Horizontal Pod Autoscaler (HPA) implementation
 - **Multi-region Deployment**: High availability and disaster recovery
 - **Web UI**: Vue.js frontend with JWT authentication
-- **Observability**: Prometheus, Grafana, and Loki integration
-- **Audit Logging**: Comprehensive security and compliance tracking
+- **Observability**: Prometheus, and  Grafana integration
+- **Audit Logging**: Comprehensive security and compliance tracking (must have)
 
-![Admin Dashboard Overview](docs/images/admin-dashboard.png)
+![Admin Dashboard Overview](/images/welcome.png)
 
 ## 🏗️ Architecture
-
-![Infrastructure Diagram](docs/images/infrastructure-diagram.png)
-
 ### Infrastructure Components
-
 - **OpenStack Cluster**: 3-node setup (1 master, 2 workers)
 - **Kubernetes Cluster**: K3s distribution for lightweight orchestration
 - **Database Service**: Zalando PostgreSQL Operator for managed databases
 - **Monitoring Stack**: Prometheus + Grafana + Loki
 - **API Gateway**: Go-based REST API with Gin framework
+![Infrastructure Diagram](/images/full-infra.png)
+
+-**Security Group**
+![Infrastructure Diagram](/images/security_group.png)
+
+-**Instances with in Cluster Ip and Floating Ip for external access**
+![Infrastructure Diagram](/images/instances.png)
+
+-**Terraforn For Provisioning**
+![Infrastructure Diagram](/images/terra-for-infra.png)
+
+
 
 ### Technology Stack
 
@@ -124,7 +137,6 @@ cd paas-api
 
 # Configure Terraform variables
 cp terraform/terraform.tfvars.example terraform/terraform.tfvars
-# Edit terraform.tfvars with your OpenStack credentials
 
 # Deploy infrastructure
 cd terraform
@@ -138,7 +150,7 @@ terraform apply
 ```bash
 # Configure Ansible inventory
 cp ansible/hosts.ini.example ansible/hosts.ini
-# Update hosts.ini with your node IPs
+# Update hosts.ini with my node IPs
 
 # Install Kubernetes cluster
 cd ansible
@@ -162,8 +174,6 @@ kubectl apply -f k8s/deployment.yaml
 ```
 
 ## 📚 API Documentation
-
-![Database Management UI](docs/images/database-management-ui.png)
 
 ### Database Management Endpoints
 
@@ -218,7 +228,9 @@ GET /pods
 GET /pods/{namespace}
 ```
 
-![Pod Management Dashboard](docs/images/pod-management-dashboard.png)
+
+![Database Management UI](/images/db-cluster-overview.png)
+![Pod Management Dashboard](/images/Pods_Mgmt.png)
 
 ## 🔧 Configuration
 
@@ -286,7 +298,7 @@ kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80
 - Username: `admin`
 - Password: `prom-operator`
 
-![Grafana Dashboard](docs/images/grafana-dashboard.png)
+![Grafana Dashboard](/images/Grafana-dashboard.png)
 
 ### Key Metrics Monitored
 
@@ -299,7 +311,7 @@ kubectl port-forward svc/monitoring-grafana -n monitoring 3000:80
 
 ### Zitadel Integration
 
-![Authentication Flow](docs/images/auth-flow.png)
+![Authentication Flow](/images/Zitadel_Conf.png)
 
 1. **User Authentication**: Login via Zitadel IdP
 2. **JWT Token**: Secure token generation
@@ -314,9 +326,9 @@ OpenStack security groups configured for:
 - **Kubernetes**: Ports 6443, 10250 for cluster communication
 - **Database**: Port 5432 for PostgreSQL (internal only)
 
-## 🌐 Multi-Tenant Architecture
+## 🌐 Multi-Tenant overview
 
-![Multi-Tenant Dashboard](docs/images/multi-tenant-dashboard.png)
+![Multi-Tenant Dashboard](/images/db-cluster-overview.png)
 
 ### Namespace Isolation
 
@@ -346,8 +358,6 @@ spec:
 
 ## 🚀 Deployment Options
 
-![Deployment Management Interface](docs/images/deployment-interface.png)
-
 ### Local Development
 
 ```bash
@@ -362,8 +372,8 @@ kubectl port-forward deployment/paas-api 8080:8080
 
 ```bash
 # Build and push Docker image
-docker build -t your-registry/paas-api:v1.0.0 .
-docker push your-registry/paas-api:v1.0.0
+docker build -t narcisse198/paas-api:v1.0.0 .
+docker push narcisse198/paas-api:v1.0.0
 
 # Deploy via Kubernetes
 kubectl apply -f k8s/production/
@@ -382,11 +392,11 @@ curl -X POST http://<NODE-IP>:30971/databases \
   -d '{"username":"testuser","db_name":"mydb"}'
 ```
 
-## 📈 Performance & Scaling
+## 📈 Cluster Monitoring
 
-![Resource Monitoring Dashboard](docs/images/resource-monitoring.png)
+![Resource Monitoring Dashboard](/images/cluster-monitoring.png)
 
-### Horizontal Pod Autoscaler
+### Horizontal Pod Autoscaler (ideal implementation but not provided in the current repos)
 
 ```yaml
 apiVersion: autoscaling/v2
@@ -409,24 +419,12 @@ spec:
         averageUtilization: 70
 ```
 
-### Database Scaling
+### Database Scaling (Ideal Options)
 
 PostgreSQL instances support:
 - **Vertical Scaling**: CPU/Memory resource adjustments
 - **Horizontal Scaling**: Read replicas (up to 5 instances)
 - **Storage Scaling**: Dynamic PVC expansion
-
-## 🔄 CI/CD Pipeline
-
-![CI/CD Pipeline](docs/images/cicd-pipeline.png)
-
-### Automated Deployment Flow
-
-1. **Code Commit**: Push to Git repository
-2. **Build**: Docker image creation
-3. **Test**: Automated testing suite
-4. **Deploy**: Kubernetes rolling update
-5. **Monitor**: Health checks and alerts
 
 ## 🛡️ Backup & Disaster Recovery
 
@@ -437,7 +435,7 @@ PostgreSQL instances support:
 kubectl apply -f k8s/backup/postgres-backup-cronjob.yaml
 ```
 
-### Multi-Region Setup
+### Multi-Region Setup (Not implemented in the current repos but has been implemented for the final Group Presentation At StackIT)
 
 - **Primary Region**: Full stack deployment
 - **DR Region**: Standby with data replication
@@ -456,33 +454,8 @@ kubectl cluster-info
 ssh -L 6443:localhost:6443 user@master-node
 ```
 
-#### Database Creation Failures
-```bash
-# Check PostgreSQL operator logs
-kubectl logs -n postgres-operator deployment/postgres-operator
-
-# Verify node resources
-kubectl top nodes
-```
-
-#### Monitoring Stack Issues
-```bash
-# Check Prometheus targets
-kubectl port-forward svc/monitoring-kube-prometheus-prometheus -n monitoring 9090:9090
-
-# Verify Grafana access
-kubectl get secret monitoring-grafana -n monitoring -o jsonpath="{.data.admin-password}" | base64 -d
-```
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 📞 Support
-
 For support and questions:
-- 📧 Email: narciobadiahdm@gmail.com
-
+- 📧 Email: narcisseobadiahdm@gmail.com
 ---
 
-**Built with ❤️ using OpenStack, Kubernetes, and Go**
+**Built with ❤️ by NarcisseObadiah using OpenStack, Kubernetes, and Go**
